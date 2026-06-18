@@ -19,6 +19,7 @@ h1{color:#FF9F0A}
 input,select{width:100%;height:42px;padding:10px;border-radius:12px;border:none;background:#1C2433;color:white}
 button{padding:12px;border:none;border-radius:14px;margin-top:14px}
 .primary{background:#FF9F0A;color:black;width:100%}
+.history-item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
 </style>
 </head>
 <body>
@@ -28,12 +29,10 @@ button{padding:12px;border:none;border-radius:14px;margin-top:14px}
 <div class="card">
 <h3>Profil</h3>
 <div class="field"><div class="label">Nom</div><input id="name"></div>
-<div class="field"><div class="label">Sexe</div>
-<select id="sex"><option>Homme</option><option>Femme</option></select></div>
+<div class="field"><div class="label">Sexe</div><select id="sex"><option>Homme</option><option>Femme</option></select></div>
 <div class="field"><div class="label">Age</div><input id="age" type="number"></div>
 <div class="field"><div class="label">Taille (cm)</div><input id="height"></div>
-<div class="field"><div class="label">Morphologie</div>
-<select id="morpho"><option value="normal">Normal</option><option value="mince">Mince</option><option value="large">Large</option></select></div>
+<div class="field"><div class="label">Morphologie</div><select id="morpho"><option value="normal">Normal</option><option value="mince">Mince</option><option value="large">Large</option></select></div>
 </div>
 
 <div class="card">
@@ -56,6 +55,12 @@ button{padding:12px;border:none;border-radius:14px;margin-top:14px}
 <div class="card"><h3>Poids</h3><canvas id="chartWeight"></canvas></div>
 <div class="card"><h3>IMC</h3><canvas id="chartBMI"></canvas></div>
 
+<!-- ✅ HISTORIQUE -->
+<div class="card">
+<h3>Historique</h3>
+<div id="history"></div>
+</div>
+
 </div>
 
 <script>
@@ -67,6 +72,7 @@ const weightEl=document.getElementById("weight");
 const heightEl=document.getElementById("height");
 const ageEl=document.getElementById("age");
 const morphoEl=document.getElementById("morpho");
+const historyEl=document.getElementById("history");
 
 window.onload=()=>{
  dateEl.value=new Date().toISOString().split("T")[0];
@@ -91,6 +97,17 @@ function addEntry(){
  if(isNaN(w)||isNaN(h)) return alert("Remplis poids + taille");
  entries.push({date:d,weight:w,bmi:parseFloat(bmi(w,h))});
  updateCharts();
+ updateHistory();
+}
+
+function updateHistory(){
+ historyEl.innerHTML = entries
+  .slice()
+  .reverse()
+  .map(e=>`<div class="history-item">
+    <span>${e.date}</span>
+    <span>${e.weight} kg | IMC ${e.bmi}</span>
+  </div>`).join("");
 }
 
 function getPeriodDays(){
