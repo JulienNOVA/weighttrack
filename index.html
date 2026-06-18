@@ -13,12 +13,28 @@
 body{margin:0;font-family:'Inter',sans-serif;background:#0B1220;color:white}
 .container{max-width:500px;margin:auto;padding:20px}
 h1{color:#FF9F0A}
-.card{background:#111827;padding:18px;border-radius:18px;margin-bottom:14px}
-.field{display:flex;flex-direction:column;margin-top:10px}
-.label{font-size:12px;color:#9CA3AF;margin-bottom:4px}
-input,select{width:100%;height:42px;padding:10px;border-radius:12px;border:none;background:#1C2433;color:white}
+
+.card{background:#111827;padding:18px;border-radius:18px;margin-bottom:14px;box-shadow:0 10px 25px rgba(0,0,0,0.3)}
+
+.field{display:flex;flex-direction:column;margin-top:12px}
+.label{font-size:12px;color:#9CA3AF;margin-bottom:6px;opacity:0.8}
+
+input,select{
+ width:100%;height:48px;padding:0 14px;border-radius:14px;
+ border:1px solid transparent;background:linear-gradient(180deg,#1C2433,#18202E);
+ color:white;font-size:15px;box-sizing:border-box
+}
+
+input:focus,select:focus{border:1px solid #FF9F0A;box-shadow:0 0 0 2px rgba(255,159,10,0.25)}
+
+select{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg fill='white' height='10' viewBox='0 0 24 24' width='10'><path d='M7 10l5 5 5-5z'/></svg>");background-repeat:no-repeat;background-position:right 12px center}
+
+/* ✅ FIX dropdown list colors */
+option{background:#1C2433;color:white}
+
 button{padding:12px;border:none;border-radius:14px;margin-top:14px}
 .primary{background:#FF9F0A;color:black;width:100%}
+
 .history-item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
 </style>
 </head>
@@ -46,20 +62,16 @@ button{padding:12px;border:none;border-radius:14px;margin-top:14px}
 <h3>Période</h3>
 <select id="period" onchange="updateCharts()">
 <option value="10">10 jours</option>
-<option value="30" selected>30 jours</option>
+<option value="30">30 jours</option>
 <option value="90">90 jours</option>
-<option value="all">Tout</option>
+<option value="all" selected>Tout</option>
 </select>
 </div>
 
 <div class="card"><h3>Poids</h3><canvas id="chartWeight"></canvas></div>
 <div class="card"><h3>IMC</h3><canvas id="chartBMI"></canvas></div>
 
-<!-- ✅ HISTORIQUE -->
-<div class="card">
-<h3>Historique</h3>
-<div id="history"></div>
-</div>
+<div class="card"><h3>Historique</h3><div id="history"></div></div>
 
 </div>
 
@@ -74,9 +86,7 @@ const ageEl=document.getElementById("age");
 const morphoEl=document.getElementById("morpho");
 const historyEl=document.getElementById("history");
 
-window.onload=()=>{
- dateEl.value=new Date().toISOString().split("T")[0];
-}
+window.onload=()=>{dateEl.value=new Date().toISOString().split("T")[0];}
 
 function bmi(w,h){return (w/((h/100)**2)).toFixed(1)}
 
@@ -96,18 +106,12 @@ function addEntry(){
  const d=dateEl.value;
  if(isNaN(w)||isNaN(h)) return alert("Remplis poids + taille");
  entries.push({date:d,weight:w,bmi:parseFloat(bmi(w,h))});
- updateCharts();
- updateHistory();
+ updateCharts();updateHistory();
 }
 
 function updateHistory(){
- historyEl.innerHTML = entries
-  .slice()
-  .reverse()
-  .map(e=>`<div class="history-item">
-    <span>${e.date}</span>
-    <span>${e.weight} kg | IMC ${e.bmi}</span>
-  </div>`).join("");
+ historyEl.innerHTML=entries.slice().reverse().map(e=>
+ `<div class="history-item"><span>${e.date}</span><span>${e.weight} kg | IMC ${e.bmi}</span></div>`).join("");
 }
 
 function getPeriodDays(){
@@ -124,10 +128,7 @@ function prepareData(){
  let start=new Date(sorted[0].date);
  let end=new Date();
 
- if(period){
-  start=new Date();
-  start.setDate(start.getDate()-period);
- }
+ if(period){start=new Date();start.setDate(start.getDate()-period);}
 
  let dates=[],weights=[],bmiData=[],ideals=[];
  let cur=new Date(start);
@@ -140,10 +141,7 @@ function prepareData(){
   if(day.length){
    weights.push(day.reduce((a,b)=>a+b.weight,0)/day.length);
    bmiData.push(day.reduce((a,b)=>a+b.bmi,0)/day.length);
-  } else {
-   weights.push(null);
-   bmiData.push(null);
-  }
+  } else {weights.push(null);bmiData.push(null);} 
 
   ideals.push(creff());
   cur.setDate(cur.getDate()+1);
@@ -152,22 +150,18 @@ function prepareData(){
  return {dates,weights,bmiData,ideals};
 }
 
-const vLine={
- id:'vline',
- afterDraw(chart){
-  if(chart.tooltip?._active?.length){
-    const x=chart.tooltip._active[0].element.x;
-    const ctx=chart.ctx;
-    ctx.beginPath(); ctx.moveTo(x,chart.chartArea.top);
-    ctx.lineTo(x,chart.chartArea.bottom);
-    ctx.strokeStyle='#aaa'; ctx.stroke();
-  }
- }
-};
-
 function updateCharts(){
  const {dates,weights,bmiData,ideals}=prepareData();
  if(!dates.length) return;
+
+ let validWeights=weights.filter(x=>x!=null);
+ let ideal=creff();
+
+ let min=Math.min(...validWeights);
+ let max=Math.max(...validWeights);
+ if(ideal){min=Math.min(min,ideal);max=Math.max(max,ideal);} 
+
+ min-=20; max+=20;
 
  if(chartWeight) chartWeight.destroy();
  if(chartBMI) chartBMI.destroy();
@@ -178,13 +172,12 @@ function updateCharts(){
    {label:'Poids',data:weights,borderColor:'#FF9F0A',spanGaps:true,tension:0.3},
    {label:'Poids idéal',data:ideals,borderColor:'white',borderDash:[5,5],spanGaps:true}
   ]},
-  options:{interaction:{mode:'index',intersect:false}},
-  plugins:[vLine]
+  options:{scales:{y:{min:min,max:max}},interaction:{mode:'index',intersect:false}}
  });
 
  chartBMI=new Chart(document.getElementById("chartBMI"),{
   type:'line',
-  data:{labels:dates,datasets:[{label:'IMC',data:bmiData,borderColor:'#32D74B',spanGaps:true,tension:0.3}]},
+  data:{labels:dates,datasets:[{label:'IMC',data:bmiData,borderColor:'#32D74B',spanGaps:true}]},
   options:{interaction:{mode:'index',intersect:false},plugins:{annotation:{annotations:{
    maigreur:{type:'box',yMin:15,yMax:18.5,backgroundColor:'rgba(255,0,0,0.1)'},
    normal:{type:'box',yMin:18.5,yMax:25,backgroundColor:'rgba(0,255,0,0.1)'},
@@ -192,8 +185,7 @@ function updateCharts(){
    ob1:{type:'box',yMin:30,yMax:35,backgroundColor:'rgba(255,165,0,0.15)'},
    ob2:{type:'box',yMin:35,yMax:40,backgroundColor:'rgba(255,0,0,0.2)'},
    ob3:{type:'box',yMin:40,yMax:45,backgroundColor:'rgba(255,0,0,0.3)'}
-  }}}},
-  plugins:[vLine]
+  }}}}
  });
 }
 </script>
