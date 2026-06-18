@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WeightTrack</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+body{margin:0;font-family:'Inter',sans-serif;background:#0B1220;color:white}
+.container{max-width:500px;margin:auto;padding:20px}
+h1{color:#FF9F0A}
+.card{background:#111827;padding:18px;border-radius:18px;margin-bottom:14px}
+.field{display:flex;flex-direction:column;margin-top:10px}
+.label{font-size:12px;color:#9CA3AF;margin-bottom:4px}
+input,select{width:100%;height:42px;padding:10px;border-radius:12px;border:none;background:#1C2433;color:white}
+button{padding:12px;border:none;border-radius:14px;margin-top:14px}
+.primary{background:#FF9F0A;color:black;width:100%}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>WeightTrack</h1>
+
+<div class="card">
+<h3>Profil</h3>
+<div class="field"><div class="label">Nom</div><input id="name"></div>
+<div class="field"><div class="label">Sexe</div>
+<select id="sex"><option>Homme</option><option>Femme</option></select></div>
+<div class="field"><div class="label">Age</div><input id="age" type="number"></div>
+<div class="field"><div class="label">Taille (cm)</div><input id="height"></div>
+<div class="field"><div class="label">Morphologie</div>
+<select id="morpho"><option value="normal">Normal</option><option value="mince">Mince</option><option value="large">Large</option></select></div>
+</div>
+
+<div class="card">
+<h3>Ajouter</h3>
+<div class="field"><div class="label">Date</div><input type="date" id="date"></div>
+<div class="field"><div class="label">Poids (kg)</div><input id="weight"></div>
+<button class="primary" onclick="addEntry()">Ajouter</button>
+</div>
+
+<div class="card">
+<h3>Période</h3>
+<select id="period" onchange="updateCharts()">
+<option value="10">10 jours</option>
+<option value="30" selected>30 jours</option>
+<option value="90">90 jours</option>
+<option value="all">Tout</option>
+</select>
+</div>
+
+<div class="card"><h3>Poids</h3><canvas id="chartWeight"></canvas></div>
+<div class="card"><h3>IMC</h3><canvas id="chartBMI"></canvas></div>
+
+</div>
+
+<script>
+let entries=[];
+let chartWeight, chartBMI;
+
+const dateEl=document.getElementById("date");
+const weightEl=document.getElementById("weight");
+const heightEl=document.getElementById("height");
+const ageEl=document.getElementById("age");
+const morphoEl=document.getElementById("morpho");
+
+window.onload=()=>{
+ dateEl.value=new Date().toISOString().split("T")[0];
+}
+
+function bmi(w,h){return (w/((h/100)**2)).toFixed(1)}
+
+function creff(){
+ const h=parseFloat(heightEl.value);
+ const a=parseFloat(ageEl.value);
+ if(isNaN(h)||isNaN(a)) return null;
+ let base=(h-100+a/10)*0.9;
+ if(morphoEl.value==="mince") base*=0.9;
+ if(morphoEl.value==="large") base*=1.1;
+ return parseFloat(base.toFixed(1));
+}
+
+function addEntry(){
+ const w=parseFloat(weightEl.value);
+ const h=parseFloat(heightEl.value);
+ const d=dateEl.value;
+ if(isNaN(w)||isNaN(h)) return alert("Remplis poids + taille");
+ entries.push({date:d,weight:w,bmi:parseFloat(bmi(w,h))});
+ updateCharts();
+}
+
+function getPeriodDays(){
+ const v=document.getElementById("period").value;
+ if(v==="all") return null;
+ return parseInt(v);
+}
+
+function prepareData(){
+ const sorted=[...entries].sort((a,b)=>new Date(a.date)-new Date(b.date));
+ if(!sorted.length) return {dates:[],weights:[],bmiData:[],ideals:[]};
+
+ const period=getPeriodDays();
+ let start=new Date(sorted[0].date);
+ let end=new Date();
+
+ if(period){
+  start=new Date();
+  start.setDate(start.getDate()-period);
+ }
+
+ let dates=[],weights=[],bmiData=[],ideals=[];
+ let cur=new Date(start);
+
+ while(cur<=end){
+  let d=cur.toISOString().split("T")[0];
+  dates.push(d);
+
+  let day=sorted.filter(e=>e.date===d);
+  if(day.length){
+   weights.push(day.reduce((a,b)=>a+b.weight,0)/day.length);
+   bmiData.push(day.reduce((a,b)=>a+b.bmi,0)/day.length);
+  } else {
+   weights.push(null);
+   bmiData.push(null);
+  }
+
+  ideals.push(creff());
+  cur.setDate(cur.getDate()+1);
+ }
+
+ return {dates,weights,bmiData,ideals};
+}
+
+const vLine={
+ id:'vline',
+ afterDraw(chart){
+  if(chart.tooltip?._active?.length){
+    const x=chart.tooltip._active[0].element.x;
+    const ctx=chart.ctx;
+    ctx.beginPath(); ctx.moveTo(x,chart.chartArea.top);
+    ctx.lineTo(x,chart.chartArea.bottom);
+    ctx.strokeStyle='#aaa'; ctx.stroke();
+  }
+ }
+};
+
+function updateCharts(){
+ const {dates,weights,bmiData,ideals}=prepareData();
+ if(!dates.length) return;
+
+ if(chartWeight) chartWeight.destroy();
+ if(chartBMI) chartBMI.destroy();
+
+ chartWeight=new Chart(document.getElementById("chartWeight"),{
+  type:'line',
+  data:{labels:dates,datasets:[
+   {label:'Poids',data:weights,borderColor:'#FF9F0A',spanGaps:true,tension:0.3},
+   {label:'Poids idéal',data:ideals,borderColor:'white',borderDash:[5,5],spanGaps:true}
+  ]},
+  options:{interaction:{mode:'index',intersect:false}},
+  plugins:[vLine]
+ });
+
+ chartBMI=new Chart(document.getElementById("chartBMI"),{
+  type:'line',
+  data:{labels:dates,datasets:[{label:'IMC',data:bmiData,borderColor:'#32D74B',spanGaps:true,tension:0.3}]},
+  options:{interaction:{mode:'index',intersect:false},plugins:{annotation:{annotations:{
+   maigreur:{type:'box',yMin:15,yMax:18.5,backgroundColor:'rgba(255,0,0,0.1)'},
+   normal:{type:'box',yMin:18.5,yMax:25,backgroundColor:'rgba(0,255,0,0.1)'},
+   surpoids:{type:'box',yMin:25,yMax:30,backgroundColor:'rgba(255,255,0,0.1)'},
+   ob1:{type:'box',yMin:30,yMax:35,backgroundColor:'rgba(255,165,0,0.15)'},
+   ob2:{type:'box',yMin:35,yMax:40,backgroundColor:'rgba(255,0,0,0.2)'},
+   ob3:{type:'box',yMin:40,yMax:45,backgroundColor:'rgba(255,0,0,0.3)'}
+  }}}},
+  plugins:[vLine]
+ });
+}
+</script>
+</body>
+</html>
